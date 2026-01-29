@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Thư mục chứa các thông tin về SCSI disk
+SCSI_DISK_PATH="/sys/class/scsi_disk"
+
+# Lặp qua tất cả các ổ SCSI và thực hiện rescan
+for disk in "$SCSI_DISK_PATH"/*; do
+    rescan_path="$disk/device/rescan"
+    if [ -e "$rescan_path" ]; then
+        echo 1 > "$rescan_path"
+    else
+        echo "Không tìm thấy file rescan tại $disk"
+    fi
+done
+growpart /dev/sda 3
+pvresize /dev/sda3
+lvextend -r -l +100%FREE /dev/mapper/vg0-lv--2
+# Mở rộng dung lượng PV và LV cho /var
+# pvresize /dev/sdb
+# lvextend -r -l +100%FREE /dev/mapper/vg1-lv--0
+
+# # Mở rộng dung lượng PV và LV cho /var/log
+# pvresize /dev/sdc
+# lvextend -r -l +100%FREE /dev/mapper/vg2-lv--0
