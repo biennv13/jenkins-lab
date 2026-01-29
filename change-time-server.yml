@@ -1,0 +1,26 @@
+---
+## This playbook installs and configures AD authentication
+
+- name: Final setting Ubuntu template
+  user: sysadmin
+  hosts: all
+  gather_facts: no
+  become: yes
+  become_method: sudo
+
+  tasks:
+    # - name: Install chrony
+    #   apt:
+    #     name: chrony
+    #     state: present
+    # - name: Set timezone to Asia/Ho_Chi_Minh
+    #   community.general.timezone:
+    #     name: Asia/Ho_Chi_Minh
+    - name: Transfer file to server
+      copy: src=./script/chrony.conf dest=/etc/chrony mode=0644
+
+    - name: Restart chronyd
+      service:
+        name: chronyd
+        state: restarted
+  
