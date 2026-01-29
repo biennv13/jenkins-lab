@@ -11,7 +11,16 @@
       command: echo '1' > /sys/class/scsi_disk/32\:0\:0\:0/device/rescan
     - name: Run multiple commands
       ansible.builtin.shell: |
-        echo '1' > /sys/class/scsi_disk/32\:0\:0\:0/device/rescan
+        SCSI_DISK_PATH="/sys/class/scsi_disk"
+        for disk in "$SCSI_DISK_PATH"/*; do
+            rescan_path="$disk/device/rescan"
+            if [ -e "$rescan_path" ]; then
+                echo 1 > "$rescan_path"
+            else
+                echo "Không tìm thấy file rescan tại $disk"
+            fi
+        done
         growpart /dev/sda 3
         pvresize /dev/sda3
         lvextend -r -l +100%FREE /dev/mapper/vg0-lv--2
+        
