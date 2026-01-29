@@ -9,7 +9,7 @@
   tasks:
     - name: Run command rescan disk
       command: echo '1' > /sys/class/scsi_disk/32\:0\:0\:0/device/rescan
-    - name: Run multiple commands
+    - name: Extend disk
       ansible.builtin.shell: |
         SCSI_DISK_PATH="/sys/class/scsi_disk"
         for disk in "$SCSI_DISK_PATH"/*; do
@@ -23,4 +23,22 @@
         growpart /dev/sda 3
         pvresize /dev/sda3
         lvextend -r -l +100%FREE /dev/mapper/vg0-lv--2
-        
+    - name: Extend CPU
+      ansible.builtin.shell: |     
+        for CPU in $(ls /sys/devices/system/cpu/ | grep cpu | grep -v idle)
+        do
+                CPU_DIR="/sys/devices/system/cpu/${CPU}"
+                echo "Found cpu: \"${CPU_DIR}\" ..."
+                CPU_STATE_FILE="${CPU_DIR}/online"
+                if [ -f "${CPU_STATE_FILE}" ]; then
+                        STATE=$(cat "${CPU_STATE_FILE}" | grep 1)
+                        if [ "${STATE}" == "1" ]; then
+                                echo -e "\t${CPU} already online"
+                        else
+                                 echo -e "\t${CPU} is new cpu, onlining cpu ..."
+                                 echo 1 > "${CPU_STATE_FILE}"
+                        fi
+                else
+                        echo -e "\t${CPU} already configured prior to hot-add"
+                fi
+        done         
