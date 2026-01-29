@@ -1,0 +1,12 @@
+- name: Post reconfigure (Windows)
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Rescan disks
+      ansible.windows.win_shell: |
+        "rescan" | diskpart
+
+    - name: Extend C drive to max size (ví dụ)
+      ansible.windows.win_shell: |
+        $size = (Get-PartitionSupportedSize -DriveLetter C).SizeMax
+        Resize-Partition -DriveLetter C -Size $size
