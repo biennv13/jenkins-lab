@@ -1,0 +1,95 @@
+---
+- name: Ubuntu - Rescan SCSI, extend LVM, online CPU hot-add
+  hosts: all
+  gather_facts: false
+  become: true
+
+  vars:
+    # ====== Disk/LVM layout (CHỈNH CHO ĐÚNG MÔI TRƯỜNG) ======
+    disk_device: "/dev/sda"
+    disk_partition_number: "3"
+    pv_device: "/dev/sda3"
+    lv_mapper_path: "/dev/mapper/vg0-lv--2"
+
+    # ====== SCSI rescan path ======
+    scsi_disk_path: "/sys/class/scsi_disk"
+
+  tasks:
+    # -----------------------------
+    # 1) Rescan SCSI disks
+    # -----------------------------
+    - name: Rescan all SCSI disks (echo 1 > /sys/class/scsi_disk/*/device/rescan)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        for disk in {{ scsi_disk_path }}/*; do
+          rescan_path="${disk}/device/rescan"
+          if [ -e "${rescan_path}" ]; then
+            echo 1 > "${rescan_path}"
+          fi
+        done
+      args:
+        executable: /bin/bash
+
+    # -----------------------------
+    # 2) Grow partition + LVM extend
+    # -----------------------------
+    - name: Grow partition {{ disk_device }} {{ disk_partition_number }}
+      ansible.builtin.command: >
+        growpart {{ disk_device }} {{ disk_partition_number }}
+      register: growpart_out
+      changed_when: >
+        (growpart_out.rc == 0) and
+        (
+          ('CHANGED' in (growpart_out.stdout | default(''))) or
+          ('CHANGED' in (growpart_out.stderr | default(''))) or
+          ('NOCHANGE' not in (growpart_out.stdout | default('')) )
+        )
+      failed_when: growpart_out.rc != 0
+
+    - name: Resize PV {{ pv_device }}
+      ansible.builtin.command: >
+        pvresize {{ pv_device }}
+      register: pvresize_out
+      changed_when: >
+        (pvresize_out.rc == 0) and
+        (
+          ('changed' in (pvresize_out.stdout | lower | default(''))) or
+          ('successfully resized' in (pvresize_out.stdout | lower | default(''))) or
+          ('resized' in (pvresize_out.stdout | lower | default('')))
+        )
+      failed_when: pvresize_out.rc != 0
+
+    - name: Extend LV to use all free space and resize filesystem online
+      ansible.builtin.command: >
+        lvextend -r -l +100%FREE {{ lv_mapper_path }}
+      register: lvextend_out
+      changed_when: lvextend_out.rc == 0
+      failed_when: lvextend_out.rc != 0
+
+    # -----------------------------
+    # 3) Online CPU hot-add
+    # -----------------------------
+    - name: Online all CPUs that are currently offline
+      ansible.builtin.shell: |
+        set -euo pipefail
+        for cpu_dir in /sys/devices/system/cpu/cpu[0-9]*; do
+          online_file="${cpu_dir}/online"
+          # cpu0 thường không có file online => coi như luôn online
+          if [ -f "${online_file}" ]; then
+            cur="$(cat "${online_file}")"
+            if [ "${cur}" != "1" ]; then
+              echo 1 > "${online_file}"
+            fi
+          fi
+        done
+      args:
+        executable: /bin/bash
+      register: cpu_online_out
+      changed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "growpart: {{ growpart_out.stdout | default('') }} {{ growpart_out.stderr | default('') }}"
+          - "pvresize: {{ pvresize_out.stdout | default('') }} {{ pvresize_out.stderr | default('') }}"
+          - "lvextend: {{ lvextend_out.stdout | default('') }} {{ lvextend_out.stderr | default('') }}"
