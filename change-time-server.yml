@@ -9,15 +9,13 @@
   become_method: sudo
 
   tasks:
-    # - name: Install chrony
-    #   apt:
-    #     name: chrony
-    #     state: present
-    # - name: Set timezone to Asia/Ho_Chi_Minh
-    #   community.general.timezone:
-    #     name: Asia/Ho_Chi_Minh
-    - name: Transfer file to server
-      copy: src=./script/chrony.conf dest=/etc/chrony mode=0644
+    - name: Install chrony
+      apt:
+       name: chrony
+       state: present
+    - name: Set timezone to Asia/Ho_Chi_Minh
+      community.general.timezone:
+        name: Asia/Ho_Chi_Minh
 
     - name: Restart chronyd
       service:
